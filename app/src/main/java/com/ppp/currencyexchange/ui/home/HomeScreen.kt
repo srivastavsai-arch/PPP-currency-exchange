@@ -671,7 +671,6 @@ private fun DeveloperCard() {
     val context = LocalContext.current
     val email = "srivastavsaiyeluri@gmail.com"
     val githubUrl = "https://github.com/srivastavsai-arch/PPP-currency-exchange"
-    val aboutText = "PPP Currency Exchange is an Android application that provides live currency conversion, offline manual exchange rates, and Purchasing Power Parity (PPP) calculations to help users understand the real value of money across different countries."
 
     var emailCopied by remember { mutableStateOf(false) }
     var githubCopied by remember { mutableStateOf(false) }
@@ -697,18 +696,18 @@ private fun DeveloperCard() {
             }
 
             Text(
-                text = aboutText,
-                style = MaterialTheme.typography.bodySmall,
+                text = "Yeluri Srivastav Sai",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(
+                text = "PPP Currency Exchange",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             HorizontalDivider()
-
-            Text(
-                text = "Yeluri Srivastav Sai",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
