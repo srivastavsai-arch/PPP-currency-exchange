@@ -12,12 +12,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import com.ppp.currencyexchange.data.model.extractRawAmount
 import com.ppp.currencyexchange.data.model.formatNumber
-import com.ppp.currencyexchange.data.model.formatWithSymbol
 import com.ppp.currencyexchange.data.model.isValidRaw
 
 @Composable
@@ -30,36 +31,26 @@ fun AmountInputField(
     label: String = "Amount",
     modifier: Modifier = Modifier
 ) {
-    var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
-    var lastRawAndSymbol by remember { mutableStateOf(Triple("", "", "")) }
+    var textFieldValue by remember { mutableStateOf("") }
+    var lastExternalRaw by remember { mutableStateOf("") }
 
-    val formatted = remember(rawAmount, currencySymbol, currencyCode, decimalPlaces) {
-        if (rawAmount.isEmpty()) "" else formatWithSymbol(rawAmount, currencySymbol, currencyCode, decimalPlaces)
+    val cleanRaw = extractRawAmount(rawAmount)
+    if (cleanRaw != lastExternalRaw) {
+        lastExternalRaw = cleanRaw
+        textFieldValue = cleanRaw
     }
 
-    val key = Triple(rawAmount, currencySymbol, currencyCode)
-    if (key != lastRawAndSymbol) {
-        lastRawAndSymbol = key
-        textFieldValue = TextFieldValue(formatted, selection = TextRange(formatted.length))
+    val transformation = remember(currencySymbol, currencyCode, decimalPlaces) {
+        CurrencyVisualTransformation(currencySymbol, currencyCode, decimalPlaces)
     }
 
     OutlinedTextField(
         value = textFieldValue,
         onValueChange = { newValue ->
-            val raw = extractRawAmount(newValue.text)
+            val raw = extractRawAmount(newValue)
             if (isValidRaw(raw)) {
-                val formattedText = if (raw.isEmpty()) "" else formatWithSymbol(raw, currencySymbol, currencyCode, decimalPlaces)
-                val rawBeforeCursor = extractRawAmount(newValue.text.substring(0, newValue.selection.start))
-                val cursorInRaw = rawBeforeCursor.length.coerceAtMost(raw.length)
-                val symbolLen = if (raw.isNotEmpty()) {
-                    val sym = if (currencyCode == "AED") " $currencySymbol" else currencySymbol
-                    sym.length
-                } else 0
-                val rawPrefix = raw.substring(0, cursorInRaw)
-                val formattedPrefixLen = if (rawPrefix.isEmpty()) 0 else formatNumber(rawPrefix, currencyCode, decimalPlaces).length
-                val cursorPos = symbolLen + formattedPrefixLen
-                textFieldValue = TextFieldValue(formattedText, selection = TextRange(cursorPos.coerceAtMost(formattedText.length)))
-                lastRawAndSymbol = Triple(raw, currencySymbol, currencyCode)
+                textFieldValue = raw
+                lastExternalRaw = raw
                 onRawAmountChange(raw)
             }
         },
@@ -67,10 +58,37 @@ fun AmountInputField(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         singleLine = true,
         modifier = modifier.fillMaxWidth(),
+        visualTransformation = transformation,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = MaterialTheme.colorScheme.outline,
             cursorColor = MaterialTheme.colorScheme.primary
         )
     )
+}
+
+private class CurrencyVisualTransformation(
+    private val currencySymbol: String,
+    private val currencyCode: String,
+    private val decimalPlaces: Int
+) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val raw = extractRawAmount(text.text)
+        if (raw.isEmpty()) return TransformedText(text, OffsetMapping.Identity)
+        val formattedInt = formatNumber(raw, currencyCode, decimalPlaces)
+        val sym = if (currencyCode == "AED") " $currencySymbol" else currencySymbol
+        val formatted = "$sym$formattedInt"
+        val annotated = AnnotatedString(formatted)
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                val rawPrefix = text.text.filter { it.isDigit() || it == '.' }.take(offset)
+                val formattedPrefix = formatNumber(rawPrefix, currencyCode, decimalPlaces)
+                return sym.length + formattedPrefix.length
+            }
+            override fun transformedToOriginal(offset: Int): Int {
+                return extractRawAmount(formatted.take(offset)).length
+            }
+        }
+        return TransformedText(annotated, offsetMapping)
+    }
 }
