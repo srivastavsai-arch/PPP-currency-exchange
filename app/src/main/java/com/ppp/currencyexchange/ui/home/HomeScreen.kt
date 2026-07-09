@@ -1,5 +1,10 @@
 package com.ppp.currencyexchange.ui.home
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -29,11 +34,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Receipt
@@ -73,8 +81,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,8 +94,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
+import java.util.Locale
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ppp.currencyexchange.data.model.currencies
+import com.ppp.currencyexchange.data.model.formatWithSymbol
 import com.ppp.currencyexchange.ui.components.AmountInputField
 import com.ppp.currencyexchange.ui.components.CurrencyPickerDialog
 import com.ppp.currencyexchange.ui.theme.FavoriteGold
@@ -122,7 +137,7 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Currency Exchange")
+                        Text("PPP Currency Exchange")
                         Spacer(modifier = Modifier.width(8.dp))
                         OnlineOfflineBadge(isOnline = uiState.isOnline)
                     }
@@ -298,31 +313,59 @@ private fun PppConverterCard(uiState: HomeUiState, viewModel: HomeViewModel) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.TrendingUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("PPP Converter", style = MaterialTheme.typography.titleMedium)
+                Text("PPP Converter", style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = { viewModel.swapPppDirection() },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SwapHoriz,
+                        contentDescription = if (uiState.pppToInr) "Swap to INR" else "Swap to foreign",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
             AmountInputField(
-                amount = uiState.pppAmount,
-                onAmountChange = { viewModel.onPppAmountChanged(it) }
+                rawAmount = uiState.pppAmount,
+                onRawAmountChange = { viewModel.onPppAmountChanged(it) },
+                currencySymbol = if (uiState.pppToInr) uiState.pppCurrency.symbol else "\u20B9",
+                currencyCode = if (uiState.pppToInr) uiState.pppCurrency.code else "INR"
             )
 
-            CurrencySelector(
-                label = "From",
-                currencyCode = uiState.pppCurrency.code,
-                currencyName = uiState.pppCurrency.name,
-                onClick = { viewModel.showCurrencyPicker(CurrencyPickerRole.FROM) }
-            )
-
-            Text(
-                text = "To: INR (PPP)",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
+            if (uiState.pppToInr) {
+                CurrencySelector(
+                    label = "From",
+                    currencyCode = uiState.pppCurrency.code,
+                    currencyName = uiState.pppCurrency.name,
+                    onClick = { viewModel.showCurrencyPicker(CurrencyPickerRole.PPP) }
+                )
+                Text(
+                    text = "To: INR (PPP)",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            } else {
+                Text(
+                    text = "From: INR",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+                CurrencySelector(
+                    label = "To",
+                    currencyCode = uiState.pppCurrency.code,
+                    currencyName = uiState.pppCurrency.name,
+                    onClick = { viewModel.showCurrencyPicker(CurrencyPickerRole.PPP) }
+                )
+            }
 
             HorizontalDivider()
 
@@ -549,6 +592,7 @@ private fun LearnTab() {
                 }
             }
         }
+        item { DeveloperCard() }
         item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
@@ -627,6 +671,127 @@ private fun ComparisonRow(scenario: String, best: String, alternative: String) {
 }
 
 @Composable
+private fun DeveloperCard() {
+    val context = LocalContext.current
+    val email = "srivastavsaiyeluri@gmail.com"
+    val githubUrl = "https://github.com/srivastavsai-arch/PPP-currency-exchange"
+    val aboutText = "PPP Currency Exchange is an Android application that provides live currency conversion, offline manual exchange rates, and Purchasing Power Parity (PPP) calculations to help users understand the real value of money across different countries."
+
+    var emailCopied by remember { mutableStateOf(false) }
+    var githubCopied by remember { mutableStateOf(false) }
+
+    if (emailCopied) {
+        LaunchedEffect(Unit) { delay(2000); emailCopied = false }
+    }
+    if (githubCopied) {
+        LaunchedEffect(Unit) { delay(2000); githubCopied = false }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Person, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Developer", style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold)
+            }
+
+            Text(
+                text = aboutText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            HorizontalDivider()
+
+            Text(
+                text = "Yeluri Srivastav Sai",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = {
+                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = Uri.parse("mailto:$email")
+                        }
+                        context.startActivity(intent)
+                    })
+                    .padding(vertical = 4.dp)
+            ) {
+                Icon(Icons.Default.Email, contentDescription = "Email",
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = email,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Email", email))
+                        emailCopied = true
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy email",
+                        modifier = Modifier.size(16.dp))
+                }
+                if (emailCopied) {
+                    Text("Copied!", style = MaterialTheme.typography.labelSmall, color = OnlineGreen)
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(githubUrl))
+                        context.startActivity(intent)
+                    })
+                    .padding(vertical = 4.dp)
+            ) {
+                Icon(Icons.Default.Code, contentDescription = "GitHub",
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = githubUrl,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                IconButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("GitHub URL", githubUrl))
+                        githubCopied = true
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy GitHub URL",
+                        modifier = Modifier.size(16.dp))
+                }
+                if (githubCopied) {
+                    Text("Copied!", style = MaterialTheme.typography.labelSmall, color = OnlineGreen)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun OnlineOfflineBadge(isOnline: Boolean) {
     val bgColor = if (isOnline) OnlineGreen else OfflineOrange
     Box(
@@ -665,7 +830,12 @@ private fun ConversionCard(
             Text("Convert", style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            AmountInputField(amount = uiState.amount, onAmountChange = onAmountChange)
+            AmountInputField(
+                rawAmount = uiState.amount,
+                onRawAmountChange = onAmountChange,
+                currencySymbol = uiState.fromCurrency.symbol,
+                currencyCode = uiState.fromCurrency.code
+            )
 
             if (uiState.inputError != null) {
                 Text(uiState.inputError!!, color = MaterialTheme.colorScheme.error,
@@ -921,6 +1091,11 @@ private fun HistoryHeader(onClear: () -> Unit, entryCount: Int) {
 
 @Composable
 private fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
+    val fromRaw = String.format(Locale.US, "%.2f", entry.fromAmount)
+    val toRaw = String.format(Locale.US, "%.2f", entry.toAmount)
+    val fromFormatted = formatWithSymbol(fromRaw, entry.fromCurrency.symbol, entry.fromCurrency.code, 2)
+    val toFormatted = formatWithSymbol(toRaw, entry.toCurrency.symbol, entry.toCurrency.code, 2)
+
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -930,7 +1105,7 @@ private fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
                 Text("${entry.fromCurrency.code} \u2192 ${entry.toCurrency.code}",
                     style = MaterialTheme.typography.titleSmall)
                 Spacer(modifier = Modifier.height(2.dp))
-                Text("${entry.fromAmount} ${entry.fromCurrency.code} = ${entry.toAmount} ${entry.toCurrency.code}",
+                Text("$fromFormatted = $toFormatted",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

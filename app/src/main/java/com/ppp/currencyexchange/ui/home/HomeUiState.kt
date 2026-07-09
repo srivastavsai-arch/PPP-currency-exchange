@@ -29,6 +29,7 @@ data class HomeUiState(
     val pppCurrency: Currency = currencies.first { it.code == "USD" },
     val pppResult: String = "",
     val pppMarketComparison: String = "",
+    val pppToInr: Boolean = true,
     val showBigMacCard: Boolean = true
 )
 
@@ -47,5 +48,5 @@ data class HistoryEntry(
 )
 
 enum class CurrencyPickerRole {
-    FROM, TO
+    FROM, TO, PPP
 }

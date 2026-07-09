@@ -13,6 +13,9 @@ import com.ppp.currencyexchange.data.local.SettingsDataStore
 import com.ppp.currencyexchange.data.model.Currency
 import com.ppp.currencyexchange.data.model.calculatePppValue
 import com.ppp.currencyexchange.data.model.currencies
+import com.ppp.currencyexchange.data.model.pppFactors
+import com.ppp.currencyexchange.data.model.formatNumber
+import com.ppp.currencyexchange.data.model.getCurrencySymbol
 import com.ppp.currencyexchange.data.repository.ConversionHistoryRepository
 import com.ppp.currencyexchange.data.repository.ExchangeRateRepository
 import com.ppp.currencyexchange.data.repository.FavoritesRepository
@@ -151,10 +154,10 @@ class HomeViewModel @Inject constructor(
 
     fun selectCurrencyFromPicker(currency: Currency) {
         val role = _uiState.value.currencyPickerRole
-        if (role == CurrencyPickerRole.FROM) {
-            onFromCurrencyChanged(currency)
-        } else {
-            onToCurrencyChanged(currency)
+        when (role) {
+            CurrencyPickerRole.FROM -> onFromCurrencyChanged(currency)
+            CurrencyPickerRole.TO -> onToCurrencyChanged(currency)
+            CurrencyPickerRole.PPP -> onPppCurrencyChanged(currency)
         }
         hideCurrencyPicker()
     }
@@ -198,11 +201,15 @@ class HomeViewModel @Inject constructor(
     fun shareResult() {
         val state = _uiState.value
         val result = state.convertedAmount
-        val fromAmount = state.amount
+        val fromRaw = state.amount
         val fromCode = state.fromCurrency.code
         val toCode = state.toCurrency.code
         if (result.isNotBlank()) {
-            val text = "$fromAmount $fromCode = $result $toCode"
+            val fromAmount = fromRaw.toDoubleOrNull()?.let {
+                val places = decimalPlaces.value
+                formatAmount(it, fromCode, if (fromCode == "JPY") 0 else places)
+            } ?: "$fromRaw $fromCode"
+            val text = "$fromAmount = $result"
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, text)
@@ -255,6 +262,11 @@ class HomeViewModel @Inject constructor(
         calculatePpp()
     }
 
+    fun swapPppDirection() {
+        _uiState.update { it.copy(pppToInr = !it.pppToInr) }
+        calculatePpp()
+    }
+
     private fun calculatePpp() {
         val state = _uiState.value
         val amountText = state.pppAmount
@@ -267,29 +279,38 @@ class HomeViewModel @Inject constructor(
             return
         }
 
-        val pppValue = calculatePppValue(amount, state.pppCurrency.code)
+        val fromCode = if (state.pppToInr) state.pppCurrency.code else "INR"
+        val pppValue = calculatePppValue(amount, fromCode)
         if (pppValue == null) {
             _uiState.update { it.copy(pppResult = "", pppMarketComparison = "") }
             return
         }
 
+        val places = decimalPlaces.value
         val marketRates = state.rates
         val marketInrRate = marketRates["INR"] ?: 0.0
-        val marketFromRate = if (state.pppCurrency.code == "USD") 1.0
-            else marketRates[state.pppCurrency.code]
-        val marketValue = if (marketFromRate != null && marketInrRate > 0) {
-            amount / marketFromRate * marketInrRate
-        } else null
 
-        val places = decimalPlaces.value
-        val formattedPpp = formatAmount(pppValue, "INR", places)
-        val formattedMarket = if (marketValue != null) formatAmount(marketValue, "INR", places) else "N/A"
-
-        _uiState.update {
-            it.copy(
-                pppResult = "\u20B9$formattedPpp",
-                pppMarketComparison = if (marketValue != null) "\u20B9$formattedMarket" else "N/A"
-            )
+        if (state.pppToInr) {
+            val marketFromRate = if (state.pppCurrency.code == "USD") 1.0
+                else marketRates[state.pppCurrency.code]
+            val marketValue = if (marketFromRate != null && marketInrRate > 0) {
+                amount / marketFromRate * marketInrRate
+            } else null
+            val formattedPpp = formatAmount(pppValue, "INR", places)
+            val formattedMarket = if (marketValue != null) formatAmount(marketValue, "INR", places) else "N/A"
+            _uiState.update {
+                it.copy(pppResult = formattedPpp, pppMarketComparison = formattedMarket)
+            }
+        } else {
+            val fromFactor = pppFactors.find { it.currencyCode == state.pppCurrency.code }?.ratePerInternationalDollar ?: 1.0
+            val marketValue = if (marketInrRate > 0 && fromFactor > 0) {
+                amount / marketInrRate * fromFactor
+            } else null
+            val formattedPpp = formatAmount(pppValue, state.pppCurrency.code, places)
+            val formattedMarket = if (marketValue != null) formatAmount(marketValue, state.pppCurrency.code, places) else "N/A"
+            _uiState.update {
+                it.copy(pppResult = formattedPpp, pppMarketComparison = formattedMarket)
+            }
         }
     }
 
@@ -364,7 +385,10 @@ class HomeViewModel @Inject constructor(
 
     fun formatAmount(amount: Double, currencyCode: String, places: Int): String {
         val actualPlaces = if (currencyCode == "JPY") 0 else places
-        return String.format(Locale.US, "%,.${actualPlaces}f", amount)
+        val raw = String.format(Locale.US, "%.${actualPlaces}f", amount)
+        val symbol = getCurrencySymbol(currencyCode)
+        val formatted = formatNumber(raw.replace(",", ""), currencyCode, actualPlaces)
+        return if (currencyCode == "AED") "$formatted $symbol" else "$symbol$formatted"
     }
 
     private fun formatErrorMessage(error: Throwable): String {
