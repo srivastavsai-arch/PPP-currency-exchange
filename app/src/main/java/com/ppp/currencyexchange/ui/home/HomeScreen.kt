@@ -96,6 +96,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.delay
 import java.util.Locale
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -688,9 +689,12 @@ private fun DeveloperCard() {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Person, contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    painter = painterResource(id = com.ppp.currencyexchange.R.drawable.logo_ppp),
+                    contentDescription = "PPP Logo",
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
                 Text("Developer", style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold)
             }
