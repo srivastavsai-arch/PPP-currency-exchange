@@ -13,7 +13,6 @@ import com.ppp.currencyexchange.data.local.SettingsDataStore
 import com.ppp.currencyexchange.data.model.Currency
 import com.ppp.currencyexchange.data.model.calculatePppValue
 import com.ppp.currencyexchange.data.model.currencies
-import com.ppp.currencyexchange.data.model.pppFactors
 import com.ppp.currencyexchange.data.model.formatNumber
 import com.ppp.currencyexchange.data.model.getCurrencySymbol
 import com.ppp.currencyexchange.data.repository.ConversionHistoryRepository
@@ -203,7 +202,6 @@ class HomeViewModel @Inject constructor(
         val result = state.convertedAmount
         val fromRaw = state.amount
         val fromCode = state.fromCurrency.code
-        val toCode = state.toCurrency.code
         if (result.isNotBlank()) {
             val fromAmount = fromRaw.toDoubleOrNull()?.let {
                 val places = decimalPlaces.value
@@ -302,9 +300,10 @@ class HomeViewModel @Inject constructor(
                 it.copy(pppResult = formattedPpp, pppMarketComparison = formattedMarket)
             }
         } else {
-            val fromFactor = pppFactors.find { it.currencyCode == state.pppCurrency.code }?.ratePerInternationalDollar ?: 1.0
-            val marketValue = if (marketInrRate > 0 && fromFactor > 0) {
-                amount / marketInrRate * fromFactor
+            val marketToRate = if (state.pppCurrency.code == "USD") 1.0
+                else marketRates[state.pppCurrency.code]
+            val marketValue = if (marketToRate != null && marketInrRate > 0) {
+                amount / marketInrRate * marketToRate
             } else null
             val formattedPpp = formatAmount(pppValue, state.pppCurrency.code, places)
             val formattedMarket = if (marketValue != null) formatAmount(marketValue, state.pppCurrency.code, places) else "N/A"
