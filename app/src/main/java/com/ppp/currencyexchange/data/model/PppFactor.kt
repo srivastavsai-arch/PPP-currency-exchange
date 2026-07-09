@@ -33,3 +33,9 @@ fun calculatePppValue(amount: Double, fromCode: String): Double? {
     val inrFactor = pppFactors.find { it.currencyCode == "INR" }?.ratePerInternationalDollar ?: return null
     return amount / fromFactor * inrFactor
 }
+
+fun calculateReversePppValue(amount: Double, toCode: String): Double? {
+    val toFactor = pppFactors.find { it.currencyCode == toCode }?.ratePerInternationalDollar ?: return null
+    val inrFactor = pppFactors.find { it.currencyCode == "INR" }?.ratePerInternationalDollar ?: return null
+    return amount / inrFactor * toFactor
+}

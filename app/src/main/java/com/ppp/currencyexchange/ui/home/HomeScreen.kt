@@ -108,7 +108,7 @@ import com.ppp.currencyexchange.ui.theme.OfflineOrange
 import com.ppp.currencyexchange.ui.theme.OnlineGreen
 
 private val pppCurrencies = currencies.filter { it.code != "INR" }
-private val tabTitles = listOf("Convert", "PPP", "Learn")
+private val tabTitles = listOf("Convert", "PPP", "About")
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
@@ -210,7 +210,7 @@ fun HomeScreen(
                         pullRefreshState = pullRefreshState
                     )
                     1 -> PppTab(uiState = uiState, viewModel = viewModel)
-                    2 -> LearnTab()
+                    2 -> AboutTab()
                 }
             }
         }
@@ -354,11 +354,11 @@ private fun PppConverterCard(uiState: HomeUiState, viewModel: HomeViewModel) {
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             } else {
-                Text(
-                    text = "From: INR",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 4.dp)
+                CurrencySelector(
+                    label = "From",
+                    currencyCode = "INR",
+                    currencyName = "Indian Rupee",
+                    onClick = {} // INR is fixed
                 )
                 CurrencySelector(
                     label = "To",
@@ -384,12 +384,7 @@ private fun PppConverterCard(uiState: HomeUiState, viewModel: HomeViewModel) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.SemiBold)
                     }
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .height(48.dp)
-                            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                    )
+                    Spacer(modifier = Modifier.width(16.dp))
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                         Text("PPP Adjusted", style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary)
@@ -519,12 +514,13 @@ private fun BigMacCard() {
 }
 
 @Composable
-private fun LearnTab() {
+private fun AboutTab() {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item { DeveloperCard() }
         item { ConceptCard(
             icon = Icons.Default.MonetizationOn,
             title = "Exchange Rate",
@@ -551,7 +547,7 @@ private fun LearnTab() {
         item { ConceptCard(
             icon = Icons.Default.Receipt,
             title = "Cost of Living",
-            body = "Cost of living measures the amount of money needed to maintain a certain standard " +
+            body = "Cost of living measures the amount of money needed to reach a certain standard " +
                     "of living in a specific location. It includes housing, food, transportation, " +
                     "healthcare, education, and other expenses. Cost of living indexes compare these " +
                     "costs between cities or countries.",
@@ -593,7 +589,6 @@ private fun LearnTab() {
                 }
             }
         }
-        item { DeveloperCard() }
         item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
@@ -795,14 +790,22 @@ private fun DeveloperCard() {
 @Composable
 private fun OnlineOfflineBadge(isOnline: Boolean) {
     val bgColor = if (isOnline) OnlineGreen else OfflineOrange
-    Box(
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(bgColor)
-            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(MaterialTheme.colorScheme.surface)
+        )
         Text(
-            text = if (isOnline) "LIVE" else "MANUAL",
+            text = if (isOnline) "LIVE" else "OFFLINE",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.surface,
             fontWeight = FontWeight.Bold

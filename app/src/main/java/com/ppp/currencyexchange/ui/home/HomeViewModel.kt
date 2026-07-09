@@ -12,6 +12,7 @@ import com.google.gson.reflect.TypeToken
 import com.ppp.currencyexchange.data.local.SettingsDataStore
 import com.ppp.currencyexchange.data.model.Currency
 import com.ppp.currencyexchange.data.model.calculatePppValue
+import com.ppp.currencyexchange.data.model.calculateReversePppValue
 import com.ppp.currencyexchange.data.model.currencies
 import com.ppp.currencyexchange.data.model.formatNumber
 import com.ppp.currencyexchange.data.model.getCurrencySymbol
@@ -256,14 +257,31 @@ class HomeViewModel @Inject constructor(
     }
 
     fun onPppCurrencyChanged(currency: Currency) {
+        _previousPppCurrencyCode = currency.code
         _uiState.update { it.copy(pppCurrency = currency) }
         calculatePpp()
     }
 
     fun swapPppDirection() {
-        _uiState.update { it.copy(pppToInr = !it.pppToInr) }
+        val state = _uiState.value
+        if (state.pppToInr) {
+            _uiState.update {
+                it.copy(pppToInr = false)
+            }
+        } else {
+            val savedCode = _previousPppCurrencyCode.ifEmpty { "USD" }
+            _uiState.update {
+                it.copy(
+                    pppToInr = true,
+                    pppCurrency = currencies.find { c -> c.code == savedCode }
+                        ?: currencies.first { c -> c.code == "USD" }
+                )
+            }
+        }
         calculatePpp()
     }
+
+    private var _previousPppCurrencyCode = "USD"
 
     private fun calculatePpp() {
         val state = _uiState.value
@@ -277,20 +295,18 @@ class HomeViewModel @Inject constructor(
             return
         }
 
-        val fromCode = if (state.pppToInr) state.pppCurrency.code else "INR"
-        val pppValue = calculatePppValue(amount, fromCode)
-        if (pppValue == null) {
-            _uiState.update { it.copy(pppResult = "", pppMarketComparison = "") }
-            return
-        }
-
         val places = decimalPlaces.value
         val marketRates = state.rates
         val marketInrRate = marketRates["INR"] ?: 0.0
 
         if (state.pppToInr) {
-            val marketFromRate = if (state.pppCurrency.code == "USD") 1.0
-                else marketRates[state.pppCurrency.code]
+            val fromCode = state.pppCurrency.code
+            val pppValue = calculatePppValue(amount, fromCode)
+            if (pppValue == null) {
+                _uiState.update { it.copy(pppResult = "", pppMarketComparison = "") }
+                return
+            }
+            val marketFromRate = if (fromCode == "USD") 1.0 else marketRates[fromCode]
             val marketValue = if (marketFromRate != null && marketInrRate > 0) {
                 amount / marketFromRate * marketInrRate
             } else null
@@ -300,13 +316,18 @@ class HomeViewModel @Inject constructor(
                 it.copy(pppResult = formattedPpp, pppMarketComparison = formattedMarket)
             }
         } else {
-            val marketToRate = if (state.pppCurrency.code == "USD") 1.0
-                else marketRates[state.pppCurrency.code]
+            val toCode = state.pppCurrency.code
+            val pppValue = calculateReversePppValue(amount, toCode)
+            if (pppValue == null) {
+                _uiState.update { it.copy(pppResult = "", pppMarketComparison = "") }
+                return
+            }
+            val marketToRate = if (toCode == "USD") 1.0 else marketRates[toCode]
             val marketValue = if (marketToRate != null && marketInrRate > 0) {
                 amount / marketInrRate * marketToRate
             } else null
-            val formattedPpp = formatAmount(pppValue, state.pppCurrency.code, places)
-            val formattedMarket = if (marketValue != null) formatAmount(marketValue, state.pppCurrency.code, places) else "N/A"
+            val formattedPpp = formatAmount(pppValue, toCode, places)
+            val formattedMarket = if (marketValue != null) formatAmount(marketValue, toCode, places) else "N/A"
             _uiState.update {
                 it.copy(pppResult = formattedPpp, pppMarketComparison = formattedMarket)
             }
