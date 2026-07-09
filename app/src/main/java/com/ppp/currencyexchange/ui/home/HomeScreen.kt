@@ -97,6 +97,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.util.Locale
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -138,8 +139,24 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("PPP Currency Exchange")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column {
+                            Text(
+                                text = "PPP Currency",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 20.sp
+                            )
+                            Text(
+                                text = "Exchange",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 20.sp
+                            )
+                        }
                         Spacer(modifier = Modifier.width(8.dp))
                         OnlineOfflineBadge(isOnline = uiState.isOnline)
                     }
