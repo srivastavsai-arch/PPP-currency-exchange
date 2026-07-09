@@ -20,19 +20,15 @@ private fun formatIndian(intPart: String): String {
     if (intPart.length <= 3) return intPart
     val lastThree = intPart.takeLast(3)
     val rest = intPart.dropLast(3)
-    val restFormatted = rest.reversed()
-        .chunked(2)
-        .joinToString(",") { it.reversed() }
-        .reversed()
+    val groups = rest.reversed().chunked(2).map { it.reversed().joinToString("") }
+    val restFormatted = groups.reversed().joinToString(",")
     return "$restFormatted,$lastThree"
 }
 
 private fun formatInternational(intPart: String): String {
     if (intPart.isEmpty()) return ""
-    return intPart.reversed()
-        .chunked(3)
-        .joinToString(",") { it.reversed() }
-        .reversed()
+    val groups = intPart.reversed().chunked(3).map { it.reversed().joinToString("") }
+    return groups.reversed().joinToString(",")
 }
 
 fun formatWithSymbol(raw: String, symbol: String, currencyCode: String, decimalPlaces: Int = 2): String {
