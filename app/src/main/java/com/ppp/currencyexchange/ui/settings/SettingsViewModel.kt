@@ -3,7 +3,6 @@ package com.ppp.currencyexchange.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ppp.currencyexchange.data.local.SettingsDataStore
-import com.ppp.currencyexchange.data.repository.ExchangeRateRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,8 +23,7 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val settingsDataStore: SettingsDataStore,
-    private val repository: ExchangeRateRepository
+    private val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -83,7 +81,7 @@ class SettingsViewModel @Inject constructor(
 
     fun resetManualRates() {
         viewModelScope.launch {
-            repository.clearManualRates()
+            settingsDataStore.saveManualPairRatesJson("{}")
         }
     }
 }
