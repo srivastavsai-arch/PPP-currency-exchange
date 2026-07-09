@@ -16,6 +16,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import com.ppp.currencyexchange.data.model.extractRawAmount
+import com.ppp.currencyexchange.data.model.formatNumber
 import com.ppp.currencyexchange.data.model.formatWithSymbol
 import com.ppp.currencyexchange.data.model.isValidRaw
 
@@ -29,14 +30,17 @@ fun AmountInputField(
     label: String = "Amount",
     modifier: Modifier = Modifier
 ) {
-    val displayValue = remember(rawAmount, currencySymbol, currencyCode, decimalPlaces) {
+    var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
+    var lastRawAndSymbol by remember { mutableStateOf(Triple("", "", "")) }
+
+    val formatted = remember(rawAmount, currencySymbol, currencyCode, decimalPlaces) {
         if (rawAmount.isEmpty()) "" else formatWithSymbol(rawAmount, currencySymbol, currencyCode, decimalPlaces)
     }
 
-    var textFieldValue by remember(displayValue) {
-        mutableStateOf(
-            TextFieldValue(displayValue, selection = TextRange(displayValue.length))
-        )
+    val key = Triple(rawAmount, currencySymbol, currencyCode)
+    if (key != lastRawAndSymbol) {
+        lastRawAndSymbol = key
+        textFieldValue = TextFieldValue(formatted, selection = TextRange(formatted.length))
     }
 
     OutlinedTextField(
@@ -44,11 +48,18 @@ fun AmountInputField(
         onValueChange = { newValue ->
             val raw = extractRawAmount(newValue.text)
             if (isValidRaw(raw)) {
-                val formatted = if (raw.isEmpty()) "" else formatWithSymbol(raw, currencySymbol, currencyCode, decimalPlaces)
-                val cursorAtEnd = newValue.text.length == newValue.selection.end
-                val newCursorPos = if (cursorAtEnd || raw.isEmpty()) formatted.length
-                    else newValue.selection.end.coerceAtMost(formatted.length)
-                textFieldValue = TextFieldValue(formatted, selection = TextRange(newCursorPos))
+                val formattedText = if (raw.isEmpty()) "" else formatWithSymbol(raw, currencySymbol, currencyCode, decimalPlaces)
+                val rawBeforeCursor = extractRawAmount(newValue.text.substring(0, newValue.selection.start))
+                val cursorInRaw = rawBeforeCursor.length.coerceAtMost(raw.length)
+                val symbolLen = if (raw.isNotEmpty()) {
+                    val sym = if (currencyCode == "AED") " $currencySymbol" else currencySymbol
+                    sym.length
+                } else 0
+                val rawPrefix = raw.substring(0, cursorInRaw)
+                val formattedPrefixLen = if (rawPrefix.isEmpty()) 0 else formatNumber(rawPrefix, currencyCode, decimalPlaces).length
+                val cursorPos = symbolLen + formattedPrefixLen
+                textFieldValue = TextFieldValue(formattedText, selection = TextRange(cursorPos.coerceAtMost(formattedText.length)))
+                lastRawAndSymbol = Triple(raw, currencySymbol, currencyCode)
                 onRawAmountChange(raw)
             }
         },
